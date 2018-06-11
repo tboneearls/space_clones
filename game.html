@@ -11,14 +11,7 @@
 	<!-- HEADER -->
 	<header>
 		<h2 id="player-score">Player 1 Score: 0</h2>
-		<h2 id="high-score">
-			<script>
-				$("#high-score").text("High Score: " + localStorage.getItem("highscore"));
-				if ($("#high-score").text() === "High Score: null") {
-					$("#high-score").text("High Score: 5000");
-				};
-			</script>
-		</h2>	
+		<h2 id="high-score"></h2>	
 		<h2 id="enemies-left">Clones: 10</h2>
 	</header>
 

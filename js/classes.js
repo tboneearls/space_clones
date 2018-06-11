@@ -33,6 +33,7 @@ playerImg.width = 60;
 playerImg.height = 60;
 
 // class for player ships
+// Why not use this class to instatiate each player? Store defaults like score, lives, turn number, isDead, etc.
 class Player {
 	constructor(firepower, shield) {
 		this.body = {
@@ -85,7 +86,6 @@ class Player {
 		}
 	}
 	draw() {
-		
 		let x = this.body.x;
 		let y = this.body.y;
 		let width = this.body.width;
@@ -126,42 +126,8 @@ class Clone {
 			this.row++;
 			this.body.x = Math.abs(this.body.x);
 			this.body.y += rowY;
-			if (this.body.x + this.body.width >= canvas.width) {
-				this.row++;
-				this.body.x -= canvas.width;
-				this.body.y += rowY;
-				if (this.body.x + this.body.width >= canvas.width) {
-					this.row++;
-					this.body.x -= canvas.width;
-					this.body.y += rowY;
-					if (this.body.x + this.body.width >= canvas.width) {
-						this.row++;
-						this.body.x -= canvas.width;
-						this.body.y += rowY;
-						if (this.body.x + this.body.width >= canvas.width) {
-							this.row++;
-							this.body.x -= canvas.width;
-							this.body.y += rowY;
-							if (this.body.x + this.body.width >= canvas.width) {
-								this.row++;
-								this.body.x -= canvas.width;
-								this.body.y += rowY;
-								if (this.body.x + this.body.width >= canvas.width) {
-									this.row++;
-									this.body.x -= canvas.width;
-									this.body.y += rowY;
-									if (this.body.x + this.body.width >= canvas.width) {
-										this.row++;
-										this.body.x -= canvas.width;
-										this.body.y += rowY;
-									}
-								}
-							}
-						}
-					}
-				} 
-			}
-		} 
+			/// I didn't see how any of that was necessary...
+		}
 		if (this.row % 2 === 1) {
 			this.direction = "left";
 		} else {
@@ -310,10 +276,12 @@ class Lasers {
 			const indexLaser = cloneFactory.clones[indexShip].shotsFired.indexOf(laser);
 			// remove that laser from the ship's array of lasers
 			cloneFactory.clones[indexShip].shotsFired.splice(indexLaser, 1);
-		} else if (firingShip === player1Ship) {
+		} else
+		if (firingShip === player1Ship) {
 			const indexLaser = player1Ship.shotsFired.indexOf(laser);
 			player1Ship.shotsFired.splice(indexLaser, 1);
-		} else if (firingShip === player2Ship) {
+		} else
+		if (firingShip === player2Ship) {
 			const indexLaser = player2Ship.shotsFired.indexOf(laser);
 			player2Ship.shotsFired.splice(indexLaser, 1);
 		}

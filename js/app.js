@@ -1,28 +1,9 @@
 // ***** GLOBAL VARIABLES *****
 
-const myStorage = window.localStorage;
-
-const url = window.location.href;
-const getQuery = url.split('?')[1];
-const isSolo = (getQuery === "players=1"? true : false)
-// use .split type thing to get the player=2 part of the URL
-// then use split type thing again to get the string after the =
-
-// TITLE SCREEN DISPLAY
-$("#player1-score").text("Player 1 Score: " + localStorage.getItem("player1score"));
-if ($("#player1-score").text() === "Player 1 Score: null") {
-	$("#player1-score").text("Player 1 Score: 0");
-};
-
-$("#player2-score").text("Player 2 Score: " + localStorage.getItem("player2score"));
-if ($("#player2-score").text() === "Player 2 Score: null") {
-	$("#player2-score").text("Player 2 Score: 0");
-};
-
-$("#high-score").text("High Score: " + localStorage.getItem("highscore"));
-if ($("#high-score").text() === "High Score: null") {
-	$("#high-score").text("High Score: 0");
-};
+// these aren't constants; they might change if the URL changes
+// window.location.search returns just the query string
+let players = window.location.search.split('?players=')[1];
+let isSolo = players == "1"; // if the query string is "?players=1", this is true
 
 // EVENT LISTENER VARIABLES
 
@@ -45,8 +26,56 @@ const startTurn = $(".start-turn");
 const gameOverModal = $(".game-over-modal");
 const endGameOver = $("#game-over-button");
 
+// It's helpful to know if its a jQuery object, vs a variable with some other value,
+// so we name the objects starting with the jquery-associated $
+// Capture any DOM object that we're going to manipulate later, so we don't have to
+// re-burden the DOM by searching again
+const $playerScore = $("#player-score");
+const $player1Score = $("#player1-score");
+const $player2Score = $("#player2-score");
+const $highScore = $("#high-score");
+
+const $level = $("#level");
+const $lives = $("#lives");
+const $turnStart = $("#turn-start");
+const $enemiesLeft = $("#enemies-left");
+
 let initialClones = 10;
 
+
+// TITLE SCREEN DISPLAY
+
+// get the value from local storage, or default to 0
+let player1score = localStorage.getItem("player1score") || 0;
+$player1Score.text("Player 1 Score: " + player1score);
+
+let player2score = localStorage.getItem("player2score") || 0;
+$player2Score.text("Player 2 Score: " + player2score);
+
+let highScore = localStorage.getItem("highscore") || 5000;
+$highScore.text("High Score: " + highScore);
+
+/*
+	I see we're setting default values for things like score, lives, isDead, etc. We also get and set localStorage throughout gameplay.
+	A faster and cleaner approach could be to use those variables locally, then only set them when the user wants to quit.
+
+	There are a TON of places where we're doing the same work, just slightly different if it's for player 1 or 2.
+	A great goal for this project would be to simplify the tasks within so we don't have to repeat that work.
+	Let's come up with a way to generically consume/update player data by only passing the player number.
+
+	Gameplay note: until I noticed on the bottom-left corner that the number of lives were changing, i had no idea i was losing a life.
+	Adding a small explosion on my ship, and/or a (-1) graphic floating off my ship when I get hit would be a better indicator.
+	I also noticed the hit-zone is pretty sensitive (because transparent pngs are larger than the actual hit-zone of lazer beams...),
+	so perhaps there's a way to tighten that up.
+**/
+
+function store (key, value) {
+	if (value) {
+		localStorage.setItem(key, value);
+	} else {
+		return localStorage.getItem(key);
+	}
+}
 
 // instantiate game object
 const game = {
@@ -57,11 +86,9 @@ const game = {
 	player1Score: "0",
 	player1Lives: 3,
 	player1IsDead: false,
-	player1Items: [],
 	player2Score: "0",
 	player2Lives: 3,
 	player2IsDead: false,
-	player2Items: [],
 	enemiesRemaining: initialClones,
 	player1Clones: 10,
 	player2Clones: 10,
@@ -110,6 +137,7 @@ const game = {
 			player1Ship.__proto__.draw = function() {		
 				let x = this.body.x;
 				let y = this.body.y;
+				// If we aren't using width and height in this function, let's lose 'em.
 				let width = this.body.width;
 				let height = this.body.height;
 				ctx.drawImage(playerImg, x, y);
@@ -124,62 +152,60 @@ const game = {
 			}
 		}
 
-		if (this.isPlayer1Turn) {
-			$("#level").text("Level: " + localStorage.getItem("player1level"));
+		if (this.isPlayer1Turn) 
+		{
+			// get the values from storage once, then use the variable to update our DOM objs
 			this.currentLevel = localStorage.getItem("player1level");
-			$("#player-score").text("Player 1 Score: " + localStorage.getItem("player1score"));
-			this.player1Score = localStorage.getItem("player1score");
-			$("#lives").text("Player 1 Lives: " + localStorage.getItem("player1lives"));
-			this.player1lives = localStorage.getItem("player1Lives");
-			$("#turn-start").text("Player 1 Start");
-			$("#turn-start").css("animation", "fadeAndScale 1s ease-in forwards");
+			$level.text("Level: " + this.currentLevel);
 
+			this.player1Score = localStorage.getItem("player1score");
+			$playerScore.text("Player 1 Score: " + this.player1Score);
+
+			this.player1lives = localStorage.getItem("player1Lives");
+			$lives.text("Player 1 Lives: " + this.player1lives);
+
+			// jQuery allows chaining so we can manipulate multiple attributes of the same object:
+			$turnStart
+				.text("Player 1 Start")
+				.css("animation", "fadeAndScale 1s ease-in forwards");
 
 
 			// if no clones remaining, display mothership shield instead
-			if (localStorage.getItem("enemiesplayer1") === "0") {
-				mothershipFactory.motherships = [];
+			let enemiesplayer1 = localStorage.getItem("enemiesplayer1");
+			mothershipFactory.motherships = []; // we do this regardless, so it belongs outside the if statement
+
+			if (enemiesplayer1 === "0") {
 				initMothership(1);
-				mothershipFactory.motherships[0].shield = (Number(localStorage.getItem("player1mothership")));
-				$("#enemies-left").text("Shield: " + localStorage.getItem("player1mothership"));
+				let player1mothership = localStorage.getItem("player1mothership");
+				mothershipFactory.motherships[0].shield = (Number(player1mothership));
+				$enemiesLeft.text("Shield: " + player1mothership);
 			} else {
-				mothershipFactory.motherships = [];
-				$("#enemies-left").text("Clones: " + localStorage.getItem("enemiesplayer1"));
+				$enemiesLeft.text("Clones: " + enemiesplayer1);
 				cloneFactory.clones = [];
-				initClones(Number(localStorage.getItem("enemiesplayer1")));
+				initClones(Number(enemiesplayer1));
 			}
 		} else {
-
-			// check if 2nd player local storage is empty
-			// need to set default local storage for 2nd player the first time
-			if (localStorage.getItem("player2level") === null) {
-				localStorage.setItem("player2lives", "3");
-				localStorage.setItem("player2score", "0");
-				localStorage.setItem("player2accshots", "0");
-				localStorage.setItem("player2totalshots", "0");
-				localStorage.setItem("enemiesplayer2", "10");
-				localStorage.setItem("player2mothership", "10");
-				localStorage.setItem("player2level", "1")
-			}
-
 			this.currentLevel = localStorage.getItem("player2level");
-			this.player2Score = localStorage.getItem("player2score");
-			this.player2Lives = localStorage.getItem("player2lives");
-			$("#level").text("Level: " + localStorage.getItem("player2level"));
-			$("#player-score").text("Player 2 Score: " + localStorage.getItem("player2score"));
-			$("#lives").text("Player 2 Lives: " + localStorage.getItem("player2lives"));
+			$level.text("Level: " + this.currentLevel);
 
-			$("#turn-start").text("Player 2 Start");
-			$("#turn-start").css("animation", "");
-			$("#turn-start").css("animation", "fadeAndScale2 1s ease-in forwards");
+			this.player2Score = localStorage.getItem("player2score");
+			$playerScore.text("Player 2 Score: " + this.player2Score);
+
+			this.player2Lives = localStorage.getItem("player2lives");
+			$lives.text("Player 2 Lives: " + this.player2Lives);
+
+			$turnStart
+				.text("Player 2 Start")
+				.css("animation", "fadeAndScale2 1s ease-in forwards");
+
 			if (localStorage.getItem("enemiesplayer2") === "0") {
 				mothershipFactory.motherships = [];
 				initMothership(1);
 				mothershipFactory.motherships[0].shield = (Number(localStorage.getItem("player2mothership")));
-				$("#enemies-left").text("Shield: " + localStorage.getItem("player2mothership"));
+				$enemiesLeft.text("Shield: " + localStorage.getItem("player2mothership"));
 			} else {
 				mothershipFactory.motherships = [];
-				$("#enemies-left").text("Clones: " + localStorage.getItem("enemiesplayer2"));
+				$enemiesLeft.text("Clones: " + localStorage.getItem("enemiesplayer2"));
 				cloneFactory.clones = [];
 				initClones(Number(localStorage.getItem("enemiesplayer2")));
 				
@@ -189,40 +215,38 @@ const game = {
 	},
 	pause() {
 		this.isPaused = !this.isPaused;
-		if (this.isPaused) {
-			$(".pause-modal").addClass("show-modal");
-			// stop animations
-			cancelAnimationFrame(cancelMe);
-		} else {
-			// this makes it so I can press enter and toggle if it's paused
-			$(".pause-modal").toggleClass("show-modal", false)
-			this.isPaused = false;
+
+		// stop animations
+		cancelAnimationFrame(cancelMe); // this happens in both the if and the else, so it can just be stated once
+		
+		// we can directly pass isPaused to toggleClass, so there's less need for the if-else check
+		$(".pause-modal").toggleClass("show-modal", this.isPaused);
+
+		if (!this.isPaused) {
 			// resume animations
-			cancelAnimationFrame(cancelMe);
 			requestAnimationFrame(animateGame);
 			event.stopPropagation();
 		}
 	},
 	genLevel() {
 		if (this.isPlayer1Turn) {
-			this.player1Clones = `${Number(initialClones) + Number(localStorage.getItem("player1level")) * 1}`;
-			localStorage.setItem("enemiesplayer1", this.player1Clones.toString());
-			$("#enemies-left").text("Clones: " + localStorage.getItem("enemiesplayer1"));
+			this.player1Clones = Number(initialClones) + Number(localStorage.getItem("player1level"));
+			localStorage.setItem("enemiesplayer1", this.player1Clones); // localStorage will set numbers as strings, no need to do the work
+			$enemiesLeft.text("Clones: " + this.player1Clones);
 			
 			initClones(this.player1Clones);
 		} else {
 			this.player2Clones = `${Number(initialClones) + Number(localStorage.getItem("player2level")) * 1}`;
-			localStorage.setItem("enemiesplayer2", this.player2Clones.toString());
-			$("#enemies-left").text("Clones: " + localStorage.getItem("enemiesplayer2"));
+			localStorage.setItem("enemiesplayer2", this.player2Clones);
+			$enemiesLeft.text("Clones: " + this.player2Clones);
 		
 			initClones(this.player2Clones);
 		}
-		
 	},
 	endLevel() {
 		laserFactory.lasers = [];
 		this.currentLevel++;
-		$("#level").text("Level: " + this.currentLevel);
+		$level.text("Level: " + this.currentLevel);
 		// for (let i = 0; i < player1Ship.shotsFired.length; i++) {
 		// 	player1Ship.shotsFired[i].shipHit(player1Ship, player1Ship.shotsFired[i]);
 		// }
@@ -235,6 +259,7 @@ const game = {
 		endLevelModal.addClass("show-modal");
 		endLevelMessage.text("You beat Level " + `${this.currentLevel - 1}` + "!");
 		nextLevel.text("Begin Level " + this.currentLevel);
+
 		if (this.isPlayer1Turn) {
 			localStorage.setItem("player1level", this.currentLevel);
 			endLevelScore.text("Player 1 Score: " + localStorage.getItem("player1score"));
@@ -254,19 +279,19 @@ const game = {
 		initMothership(1);
 		// cancelAnimationFrame(cancelMe4)
 		// requestAnimationFrame(animateMothership);
-		$("#enemies-left").text("Shield: 10")
+		$enemiesLeft.text("Shield: 10")
 	},
 	hitMothership(mothership) {
 		if (this.isPlayer1Turn) {
 			mothership.shield--;
 			localStorage.setItem("player1mothership", mothership.shield.toString());
-			$("#enemies-left").text("Shield: " + localStorage.getItem("player1mothership"));
+			$enemiesLeft.text("Shield: " + localStorage.getItem("player1mothership"));
 			this.accurateShotsPlayer1++;
 			localStorage.setItem("player1accshots", this.accurateShotsPlayer1.toString());
 		} else {
 			mothership.shield--;
 			localStorage.setItem("player2mothership", mothership.shield.toString());
-			$("#enemies-left").text("Shield: " + localStorage.getItem("player2mothership"));
+			$enemiesLeft.text("Shield: " + localStorage.getItem("player2mothership"));
 			this.accurateShotsPlayer2++;
 			localStorage.setItem("player2accshots", this.accurateShotsPlayer2.toString());
 		}
@@ -278,11 +303,11 @@ const game = {
 		if (this.isPlayer1Turn) {
 			this.player1Score = `${Number(this.player1Score) + 1500}`;
 			localStorage.setItem("player1score", this.player1Score.toString());
-			$("#player-score").text("Player 1 Score: " + localStorage.getItem("player1score").toString());
+			$playerScore.text("Player 1 Score: " + localStorage.getItem("player1score").toString());
 		} else {
 			this.player2Score = `${Number(this.player2Score) + 1500}`;
 			localStorage.setItem("player2score", this.player2Score.toString());
-			$("#player-score").text("Player 2 Score: " + localStorage.getItem("player2score").toString());
+			$playerScore.text("Player 2 Score: " + localStorage.getItem("player2score").toString());
 		}
 
 		if (mothership.shield <= 0) {
@@ -307,7 +332,7 @@ const game = {
 			if (this.player1Score === "9000" || this.player1Score === "15000" || this.player1Score === "22000") {
 				this.player1Lives++;
 				localStorage.setItem("player1lives", this.player1Lives.toString());
-				$("#lives").text("Player 1 Lives: " + localStorage.getItem("player1lives"));
+				$lives.text("Player 1 Lives: " + localStorage.getItem("player1lives"));
 				if (this.animation1) {
 					$("#extra-life").css("animation", "extraLives 1s ease-in forwards");
 					this.animation1 = false;
@@ -316,7 +341,7 @@ const game = {
 					this.animation1 = true;
 				}
 			}
-			$("#player-score").text("Player 1 Score: " + localStorage.getItem("player1score"));
+			$playerScore.text("Player 1 Score: " + localStorage.getItem("player1score"));
 
 		} else {
 			this.player2Clones--;
@@ -330,7 +355,7 @@ const game = {
 			if (this.player2Score === "9000" || this.player2Score === "15000" || this.player2Score === "22000") {
 				this.player2Lives++;
 				localStorage.setItem("player2lives", this.player2Lives.toString());
-				$("#lives").text("Player 2 Lives: " + localStorage.getItem("player2lives"));
+				$lives.text("Player 2 Lives: " + localStorage.getItem("player2lives"));
 				if (this.animation1) {
 					$("#extra-life").css("animation", "extraLives 1s ease-in forwards");
 					this.animation1 = false;
@@ -339,18 +364,18 @@ const game = {
 					this.animation1 = true;
 				}
 			}
-			$("#player-score").text("Player 2 Score: " + localStorage.getItem("player2score"));
+			$playerScore.text("Player 2 Score: " + localStorage.getItem("player2score"));
 		}
 		
 		// set high score updating conditions
 		if (Number(localStorage.getItem("player1score")) > Number(localStorage.getItem("player2score")) && Number(localStorage.getItem("player1score")) > Number(localStorage.getItem("highscore"))) {
 			this.highScore = this.player1Score;
 			localStorage.setItem("highscore", this.highScore.toString());
-			document.getElementById("high-score").innerHTML = ("High Score: " + localStorage.getItem("highscore"));
+			$highScore.text("High Score: " + localStorage.getItem("highscore"));
 		} else if (Number(localStorage.getItem("player2score")) > Number(localStorage.getItem("player1score")) && Number(localStorage.getItem("player2score")) > Number(localStorage.getItem("highscore"))) {
 			this.highScore = this.player2Score;
 			localStorage.setItem("highscore", this.highScore.toString());
-			document.getElementById("high-score").innerHTML = ("High Score: " + localStorage.getItem("highscore"));
+			$highScore.text("High Score: " + localStorage.getItem("highscore"));
 		}
 	},
 	reset() {
@@ -373,7 +398,7 @@ const game = {
 				cloneFactory.clones.splice(index, 1);
 				localStorage.setItem("enemiesplayer1", `${Number(localStorage.getItem("enemiesplayer1")) - 1}`);
 				this.score();
-				$("#enemies-left").text("Clones: " + localStorage.getItem("enemiesplayer1"));
+				$enemiesLeft.text("Clones: " + localStorage.getItem("enemiesplayer1"));
 				if (localStorage.getItem("enemiesplayer1") === "0") {
 					this.initMothership();
 				}
@@ -382,7 +407,7 @@ const game = {
 				cloneFactory.clones.splice(index, 1);
 				localStorage.setItem("enemiesplayer2", `${Number(localStorage.getItem("enemiesplayer2")) - 1}`);
 				this.score();
-				$("#enemies-left").text("Clones: " + localStorage.getItem("enemiesplayer2"));
+				$enemiesLeft.text("Clones: " + localStorage.getItem("enemiesplayer2"));
 				if (localStorage.getItem("enemiesplayer2") === "0") {
 					this.initMothership();
 				}
@@ -398,7 +423,7 @@ const game = {
 			localStorage.setItem("player1lives", this.player1Lives.toString());
 			if (!this.player1IsDead) {
 				// so lives don't keep going down
-				$("#lives").text("Player 1 Lives: " + localStorage.getItem("player1lives"));
+				$lives.text("Player 1 Lives: " + localStorage.getItem("player1lives"));
 				if (localStorage.getItem("player1lives")=== "0") {
 					this.player1IsDead = true;
 					console.log("The animation frame closes AFTER I remove the game objects, which throws an error.");
@@ -414,7 +439,7 @@ const game = {
 				this.player1Lives--;
 				localStorage.setItem("player1lives", this.player1Lives.toString());
 				if (!this.player1IsDead) {
-					$("#lives").text("Player 1 Lives: " + localStorage.getItem("player1lives"));
+					$lives.text("Player 1 Lives: " + localStorage.getItem("player1lives"));
 				}
 				if (localStorage.getItem("player1lives") === "0" && !this.player1IsDead) {
 					this.player1IsDead = true;
@@ -430,7 +455,7 @@ const game = {
 				this.player2Lives--;
 				localStorage.setItem("player2lives", this.player2Lives.toString());
 				if (!this.player2IsDead) {
-					$("#lives").text("Player 2 Lives: " + localStorage.getItem("player2lives"));
+					$lives.text("Player 2 Lives: " + localStorage.getItem("player2lives"));
 				}
 
 				if (localStorage.getItem("player2lives") === "0" && !this.player2IsDead) {
@@ -464,6 +489,7 @@ controls.on("click", function(event){
 })
 
 closeControls.on("click", function(event) {
+	// this could better be stated by simply .removeClass("show-modal")
 	$(this).parent().parent().toggleClass("show-modal", false)
 	event.stopPropagation();
 })
@@ -548,6 +574,7 @@ const returnToTitle = () => {
 }
 
 // function to restore all default stats for both players
+// Why can't we do this at the beginning?
 const setDefault = () => {
 	this.player1Score = 0;
 	this.player1IsDead = false;
@@ -592,8 +619,8 @@ const initMothership = (numShips) => {
 }
 const initClones = (numClones) => {
 	for (let i = 0; i < numClones; i++) {
-	cloneFactory.generateClone(new Clone());
-	cloneFactory.clones[i].initialize();
+		cloneFactory.generateClone(new Clone());
+		cloneFactory.clones[i].initialize();
 	}
 
 }
@@ -602,7 +629,7 @@ const round = (value, precision) => {
 	return Math.round(value * multiplier) / multiplier;
 }
 initClones(initialClones);
-$("#enemies-left").text("Clones: " + initialClones);
+$enemiesLeft.text("Clones: " + initialClones);
 
 const restartAnimation = () => {
 	const element = $("h1")[0];
